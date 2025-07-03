@@ -1444,41 +1444,6 @@ http://127.0.0.1:25500/getruleset?type=%TYPE%&url=%URL%&group=%GROUP%
 
 运行 subconverter 主程序后， 按照 [调用地址 (规则转换)](#调用地址-规则转换) 的对应内容替换即可得到指定类型的规则。
 
-## smart策略组支持（作者： js882829，时间：2024-07-08）
-
-subconverter现已支持mihomo/openclash的smart策略组，支持如下参数：
-- uselightgbm: 是否使用LightGBM算法（bool）
-- collectdata: 是否收集数据（bool）
-- policy-priority: 策略优先级（int）
-- filter: 节点筛选正则（string）
-- include-all: 是否包含所有节点（bool）
-- 其他通用参数如interval、tolerance等
-
-### 配置示例（TOML）
-
-[[proxy_groups]]
-name = "智能节点"
-type = "smart"
-filter = "(?i)美|us|usa|america"
-uselightgbm = true
-collectdata = true
-policy-priority = 1
-include-all = true
-rule = ["节点1", "节点2"]
-
-### 导出示例（YAML）
-
-- name: "智能节点"
-  type: smart
-  filter: "(?i)美|us|usa|america"
-  uselightgbm: true
-  collectdata: true
-  policy-priority: 1
-  include-all: true
-  proxies:
-    - 节点1
-    - 节点2
-
 ### smart策略组支持
 
 subconverter 现已支持 mihomo/openclash 的 smart 策略组，支持如下参数：
