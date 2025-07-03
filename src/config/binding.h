@@ -73,6 +73,16 @@ namespace toml
                     conf.Lazy = find_or<bool>(v, "lazy", false);
                 if(v.contains("evaluate-before-use"))
                     conf.EvaluateBeforeUse = find_or(v, "evaluate-before-use", conf.EvaluateBeforeUse.get());
+                if(v.contains("uselightgbm"))
+                    conf.UseLightGBM = find_or<bool>(v, "uselightgbm", false);
+                if(v.contains("collectdata"))
+                    conf.CollectData = find_or<bool>(v, "collectdata", false);
+                if(v.contains("policy-priority"))
+                    conf.PolicyPriority = find_or<StrArray>(v, "policy-priority", {});
+                if(v.contains("filter"))
+                    conf.Filter = find_or<String>(v, "filter", "");
+                if(v.contains("include-all"))
+                    conf.IncludeAll = find_or<bool>(v, "include-all", false);
                 break;
             default:
                 throw serialization_error(format_error("Proxy Group has unsupported type!", v.at("type").location(), "should be one of following: select, url-test, load-balance, fallback, relay, ssid"), v.at("type").location());

@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY_IMAGE: tindy2013/subconverter
+  REGISTRY_IMAGE: sinbreak/subconverter
 
 jobs:
   build:

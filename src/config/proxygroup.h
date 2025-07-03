@@ -35,6 +35,11 @@ struct ProxyGroupConfig
     Boolean DisableUdp;
     Boolean Persistent;
     Boolean EvaluateBeforeUse;
+    Boolean UseLightGBM;
+    Boolean CollectData;
+    StrArray PolicyPriority;
+    String Filter;
+    Boolean IncludeAll;
 
     String TypeStr() const
     {

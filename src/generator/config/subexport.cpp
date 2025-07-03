@@ -599,10 +599,20 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
         string_array filtered_nodelist;
 
         singlegroup["name"] = x.Name;
-        if (x.Type == ProxyGroupType::Smart)
-            singlegroup["type"] = "url-test";
-        else
+        if (x.Type == ProxyGroupType::Smart) {
+            singlegroup["type"] = "smart";
+            if (!x.Filter.empty()) singlegroup["filter"] = x.Filter;
+            if (!x.UseLightGBM.is_undef()) singlegroup["uselightgbm"] = x.UseLightGBM.get();
+            if (!x.CollectData.is_undef()) singlegroup["collectdata"] = x.CollectData.get();
+            if (!x.PolicyPriority.empty()) {
+                YAML::Node arr;
+                for (const auto& v : x.PolicyPriority) arr.push_back(v);
+                singlegroup["policy-priority"] = arr;
+            }
+            if (!x.IncludeAll.is_undef()) singlegroup["include-all"] = x.IncludeAll.get();
+        } else {
             singlegroup["type"] = x.TypeStr();
+        }
 
         switch(x.Type)
         {
