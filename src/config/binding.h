@@ -268,6 +268,32 @@ namespace INIBinding
                         conf.Proxies.emplace_back(std::move(vArray[i]));
                 }
                 confs.emplace_back(std::move(conf));
+                // 新增：解析 | 后参数
+                // 作者：js882829  时间：2025-07-03
+                // 检查最后一段是否包含 |，如有则解析
+                auto pipe_pos = vArray.back().find('|');
+                if (pipe_pos != std::string::npos) {
+                    std::string params = vArray.back().substr(pipe_pos + 1);
+                    StrArray paramList = split(params, ",");
+                    for (const auto& param : paramList) {
+                        auto kv = split(param, ":");
+                        if (kv.size() != 2) continue;
+                        std::string key = trim(kv[0]);
+                        std::string value = trim(kv[1]);
+                        if (key == "uselightgbm") confs.back().UseLightGBM = (value == "true");
+                        else if (key == "collectdata") confs.back().CollectData = (value == "true");
+                        else if (key == "policy-priority") {
+                            // 处理 ["Large:1.5"] 或 [Large:1.5] 这种格式
+                            if (!value.empty() && value.front() == '[' && value.back() == ']') {
+                                std::string arr = value.substr(1, value.size() - 2);
+                                confs.back().PolicyPriority = split(arr, ";");
+                            } else {
+                                confs.back().PolicyPriority = split(value, ";");
+                            }
+                        }
+                        // 可扩展更多参数
+                    }
+                }
             }
             return confs;
         }

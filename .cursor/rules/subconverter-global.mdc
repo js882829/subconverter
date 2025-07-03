@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# subconverter 源码全局结构规则
+
+## 1. 配置与数据结构
+- [src/config/binding.h](mdc:src/config/binding.h)：INI、TOML、YAML 配置解析绑定，custom_proxy_group 解析、策略组参数支持核心。
+- [src/config/proxygroup.h](mdc:src/config/proxygroup.h)：ProxyGroupConfig 结构体，描述所有策略组字段。
+- [src/config/ruleset.h](mdc:src/config/ruleset.h)：规则集结构体。
+
+## 2. 生成与导出
+- [src/generator/config/subexport.cpp](mdc:src/generator/config/subexport.cpp)：Clash/Surge 等格式配置导出，策略组、规则集、节点等最终输出。
+- [src/generator/config/nodemanip.cpp](mdc:src/generator/config/nodemanip.cpp)：节点处理、分组、筛选。
+- [src/generator/config/ruleconvert.cpp](mdc:src/generator/config/ruleconvert.cpp)：规则集格式转换。
+
+## 3. 解析与处理
+- [src/handler/settings.cpp](mdc:src/handler/settings.cpp)：全局配置加载、文件读取与全局变量赋值。
+- [src/handler/interfaces.cpp](mdc:src/handler/interfaces.cpp)：HTTP API、Web 界面、订阅转换主入口，参数解析、请求分发、最终调用导出逻辑。
+- [src/parser/subparser.cpp](mdc:src/parser/subparser.cpp)：订阅链接、节点格式解析，节点属性填充。
+
+## 4. 工具与基础设施
+- [src/utils/](mdc:src/utils)：字符串、正则、base64、文件、网络、日志等通用工具。
+- [src/server/](mdc:src/server)：内置 web server、socket 通信。
+- [src/script/](mdc:src/script)：脚本引擎支持（quickjs/duktape）。
+
+## 5. 入口与主流程
+- [src/main.cpp](mdc:src/main.cpp)：程序主入口，初始化、参数解析、主循环。
+
+## 6. 注释规范
+- 本项目所有新增/修改的注释，作者统一为：js882829，日期使用系统当前日期（如 2025-07-03）。
+
+---
+
+## 典型流程举例
+- 外部 ini/toml/yaml 配置 → [src/handler/settings.cpp](mdc:src/handler/settings.cpp) 解析 → [src/config/binding.h](mdc:src/config/binding.h) 结构体填充
+- custom_proxy_group 行支持 smart 组高级参数，解析后填充到 ProxyGroupConfig
+- 生成 clash/surge 配置时由 [src/generator/config/subexport.cpp](mdc:src/generator/config/subexport.cpp) 输出
+- 节点订阅解析由 [src/parser/subparser.cpp](mdc:src/parser/subparser.cpp) 负责
