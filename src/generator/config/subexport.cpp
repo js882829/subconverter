@@ -593,8 +593,20 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
         yamlnode["Proxy"] = proxies;
 
 
-    for(const ProxyGroupConfig &x : extra_proxy_group)
+    for(const ProxyGroupConfig &x_origin : extra_proxy_group)
     {
+        ProxyGroupConfig x = x_origin;
+        if (x.Type == ProxyGroupType::Smart) {
+            auto it = x.Proxies.begin();
+            while (it != x.Proxies.end()) {
+                if (it->find("http://") == 0 || it->find("https://") == 0) {
+                    x.Url = *it;
+                    it = x.Proxies.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
         try {
             YAML::Node singlegroup;
             string_array filtered_nodelist;
