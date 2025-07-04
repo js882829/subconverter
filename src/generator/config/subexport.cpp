@@ -620,18 +620,9 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
             YAML::Node singlegroup;
             // 统一写入 type
             singlegroup["type"] = x.TypeStr();
-            // name 字段如包含特殊字符自动加引号
-            auto need_quote = [](const std::string& s) {
-                for (char c : s) {
-                    if ((unsigned char)c > 127 || c == ' ' || c == ':' || c == '"' || c == '\'' || c == '\\') return true;
-                }
-                return false;
-            };
+            // name 字段直接赋值，不手动加引号，交给 YAML 库自动处理
             if (!x.Name.empty()) {
-                if (need_quote(x.Name))
-                    singlegroup["name"] = '"' + x.Name + '"';
-                else
-                    singlegroup["name"] = x.Name;
+                singlegroup["name"] = x.Name;
             }
             if (!x.Url.empty()) singlegroup["url"] = x.Url;
             if (x.Interval > 0) singlegroup["interval"] = x.Interval;
