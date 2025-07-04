@@ -652,6 +652,7 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
                 debug_ss << "; ";
             }
             writeLog(LOG_TYPE_INFO, debug_ss.str(), LOG_LEVEL_INFO);
+            original_groups.push_back(singlegroup);
             // ...后续原有逻辑...
         } catch (const std::exception& e) {
             std::stringstream err_ss;
