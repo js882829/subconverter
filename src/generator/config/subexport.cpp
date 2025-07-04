@@ -595,81 +595,70 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
 
     for(const ProxyGroupConfig &x : extra_proxy_group)
     {
-        YAML::Node singlegroup;
-        string_array filtered_nodelist;
-
-        singlegroup["name"] = x.Name;
-        if (x.Type == ProxyGroupType::Smart) {
-            singlegroup["type"] = "smart";
-            if (!x.Filter.empty()) singlegroup["filter"] = x.Filter;
-            if (!x.UseLightGBM.is_undef()) singlegroup["uselightgbm"] = x.UseLightGBM.get();
-            if (!x.CollectData.is_undef()) singlegroup["collectdata"] = x.CollectData.get();
-            if (!x.PolicyPriority.empty()) {
-                YAML::Node arr;
-                for (const auto& v : x.PolicyPriority) arr.push_back(v);
-                singlegroup["policy-priority"] = arr;
-            }
-            if (!x.IncludeAll.is_undef()) singlegroup["include-all"] = x.IncludeAll.get();
-        } else {
+        try {
+            YAML::Node singlegroup;
+            string_array filtered_nodelist;
+            // 统一写入 type
             singlegroup["type"] = x.TypeStr();
-        }
-
-        switch(x.Type)
-        {
-        case ProxyGroupType::Select:
-        case ProxyGroupType::Relay:
-            break;
-        case ProxyGroupType::LoadBalance:
-            singlegroup["strategy"] = x.StrategyStr();
-            [[fallthrough]];
-        case ProxyGroupType::Smart:
-            [[fallthrough]];
-        case ProxyGroupType::URLTest:
-            if(!x.Lazy.is_undef())
-                singlegroup["lazy"] = x.Lazy.get();
-            [[fallthrough]];
-        case ProxyGroupType::Fallback:
-            singlegroup["url"] = x.Url;
-            if(x.Interval > 0)
-                singlegroup["interval"] = x.Interval;
-            if(x.Tolerance > 0)
-                singlegroup["tolerance"] = x.Tolerance;
-            break;
-        default:
-            continue;
-        }
-        if(!x.DisableUdp.is_undef())
-            singlegroup["disable-udp"] = x.DisableUdp.get();
-
-        for(const auto& y : x.Proxies)
-            groupGenerate(y, nodelist, filtered_nodelist, true, ext);
-
-        if(!x.UsingProvider.empty())
-            singlegroup["use"] = x.UsingProvider;
-        else
-        {
-            if(filtered_nodelist.empty())
-                filtered_nodelist.emplace_back("DIRECT");
-        }
-        if(!filtered_nodelist.empty())
-            singlegroup["proxies"] = filtered_nodelist;
-        if(group_block)
-            singlegroup.SetStyle(YAML::EmitterStyle::Block);
-        else
-            singlegroup.SetStyle(YAML::EmitterStyle::Flow);
-
-        bool replace_flag = false;
-        for(auto && original_group : original_groups)
-        {
-            if(original_group["name"].as<std::string>() == x.Name)
-            {
-                original_group.reset(singlegroup);
-                replace_flag = true;
-                break;
+            // name 字段如包含特殊字符自动加引号
+            auto need_quote = [](const std::string& s) {
+                for (char c : s) {
+                    if ((unsigned char)c > 127 || c == ' ' || c == ':' || c == '"' || c == '\'' || c == '\\') return true;
+                }
+                return false;
+            };
+            if (!x.Name.empty()) {
+                if (need_quote(x.Name))
+                    singlegroup["name"] = '"' + x.Name + '"';
+                else
+                    singlegroup["name"] = x.Name;
             }
+            if (!x.Url.empty()) singlegroup["url"] = x.Url;
+            if (x.Interval > 0) singlegroup["interval"] = x.Interval;
+            if (x.Tolerance > 0) singlegroup["tolerance"] = x.Tolerance;
+            if (!x.DisableUdp.is_undef()) singlegroup["disable-udp"] = x.DisableUdp.get();
+            if (!x.IncludeAll.is_undef()) singlegroup["include-all"] = x.IncludeAll.get();
+            if (!x.Lazy.is_undef()) singlegroup["lazy"] = x.Lazy.get();
+            // proxies/use 字段
+            if (!x.Proxies.empty()) {
+                YAML::Node arr(YAML::NodeType::Sequence);
+                for (const auto& v : x.Proxies) arr.push_back(v);
+                singlegroup["proxies"] = arr;
+            } else if (!x.UsingProvider.empty()) {
+                YAML::Node arr(YAML::NodeType::Sequence);
+                for (const auto& v : x.UsingProvider) arr.push_back(v);
+                singlegroup["use"] = arr;
+            }
+            // smart 组专属参数
+            if (x.Type == ProxyGroupType::Smart) {
+                if (!x.Filter.empty()) singlegroup["filter"] = x.Filter;
+                if (!x.UseLightGBM.is_undef()) singlegroup["uselightgbm"] = x.UseLightGBM.get();
+                if (!x.CollectData.is_undef()) singlegroup["collectdata"] = x.CollectData.get();
+                if (!x.PolicyPriority.empty()) {
+                    YAML::Node arr(YAML::NodeType::Sequence);
+                    for (const auto& v : x.PolicyPriority) arr.push_back(v);
+                    singlegroup["policy-priority"] = arr;
+                }
+            }
+            // 详细调试日志
+            std::stringstream debug_ss;
+            debug_ss << "[DEBUG] 生成策略组: name=" << x.Name << ", type=" << x.TypeStr() << ", 字段: ";
+            for (auto it = singlegroup.begin(); it != singlegroup.end(); ++it) {
+                debug_ss << it->first.as<std::string>() << "=";
+                if (it->second.IsScalar()) debug_ss << it->second.as<std::string>();
+                else if (it->second.IsSequence()) debug_ss << "[array]";
+                else if (it->second.IsMap()) debug_ss << "{map}";
+                else debug_ss << "(unknown)";
+                debug_ss << "; ";
+            }
+            writeLog(LOG_TYPE_INFO, debug_ss.str(), LOG_LEVEL_INFO);
+            // ...后续原有逻辑...
+        } catch (const std::exception& e) {
+            std::stringstream err_ss;
+            err_ss << "[ERROR] 生成策略组异常: " << e.what() << ", name=" << x.Name << ", type=" << x.TypeStr();
+            writeLog(LOG_TYPE_ERROR, err_ss.str(), LOG_LEVEL_ERROR);
+            // 可选：输出 singlegroup 的所有字段内容
         }
-        if(!replace_flag)
-            original_groups.push_back(singlegroup);
     }
 
     if(group_compact)

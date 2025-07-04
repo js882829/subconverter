@@ -201,99 +201,160 @@ namespace INIBinding
     template<class T> struct from
     {};
 
+    // 工具函数：将 vector<string_view> 转为 vector<string>
+    template<typename T>
+    std::vector<std::string> to_string_vector(const std::vector<T>& v) {
+        std::vector<std::string> result;
+        result.reserve(v.size());
+        for (const auto& s : v) result.emplace_back(s);
+        return result;
+    }
+
     template<>
     struct from<ProxyGroupConfig>
     {
         static ProxyGroupConfigs from_ini(const StrArray &arr)
         {
+            // 打印原始 ini 配置内容，便于调试
+            std::string ini_raw;
+            for (const auto& line : arr) ini_raw += line + "\n";
+            writeLog(LOG_TYPE_INFO, "custom_proxy_group ini原始内容:\n" + ini_raw, LOG_LEVEL_INFO);
+
             ProxyGroupConfigs confs;
             for(const String &x : arr)
             {
-                unsigned int rules_upper_bound = 0;
-                ProxyGroupConfig conf;
-
                 StrArray vArray = split(x, "`");
                 if(vArray.size() < 3)
                     continue;
 
+                ProxyGroupConfig conf;
                 conf.Name = vArray[0];
                 String type = vArray[1];
 
-                rules_upper_bound = vArray.size();
+                // 识别类型
                 switch(hash_(type))
                 {
-                case "select"_hash:
-                    conf.Type = ProxyGroupType::Select;
-                    break;
-                case "relay"_hash:
-                    conf.Type = ProxyGroupType::Relay;
-                    break;
-                case "url-test"_hash:
-                    conf.Type = ProxyGroupType::URLTest;
-                    break;
-                case "fallback"_hash:
-                    conf.Type = ProxyGroupType::Fallback;
-                    break;
-                case "load-balance"_hash:
-                    conf.Type = ProxyGroupType::LoadBalance;
-                    break;
-                case "ssid"_hash:
-                    conf.Type = ProxyGroupType::SSID;
-                    break;
-                case "smart"_hash:
-                    conf.Type = ProxyGroupType::Smart;
-                    break;
-                default:
-                    continue;
+                    case "select"_hash:       conf.Type = ProxyGroupType::Select; break;
+                    case "relay"_hash:        conf.Type = ProxyGroupType::Relay; break;
+                    case "url-test"_hash:     conf.Type = ProxyGroupType::URLTest; break;
+                    case "fallback"_hash:     conf.Type = ProxyGroupType::Fallback; break;
+                    case "load-balance"_hash: conf.Type = ProxyGroupType::LoadBalance; break;
+                    case "ssid"_hash:         conf.Type = ProxyGroupType::SSID; break;
+                    case "smart"_hash:        conf.Type = ProxyGroupType::Smart; break;
+                    default: continue;
                 }
 
+                unsigned int rules_upper_bound = vArray.size();
                 if(conf.Type == ProxyGroupType::URLTest || conf.Type == ProxyGroupType::LoadBalance || conf.Type == ProxyGroupType::Fallback)
                 {
-                    if(rules_upper_bound < 5)
-                        continue;
+                    if(rules_upper_bound < 5) continue;
                     rules_upper_bound -= 2;
                     conf.Url = vArray[rules_upper_bound];
                     parseGroupTimes(vArray[rules_upper_bound + 1], &conf.Interval, &conf.Timeout, &conf.Tolerance);
                 }
 
-                for(unsigned int i = 2; i < rules_upper_bound; i++)
-                {
-                    if(startsWith(vArray[i], "!!PROVIDER="))
-                    {
-                        string_array list = split(vArray[i].substr(11), ",");
-                        conf.UsingProvider.reserve(conf.UsingProvider.size() + list.size());
-                        std::move(list.begin(), list.end(), std::back_inserter(conf.UsingProvider));
+                // smart组特殊处理
+                if (conf.Type == ProxyGroupType::Smart) {
+                    // 取最后两个非空字段
+                    std::vector<std::string> nonEmptyFields;
+                    for (auto it = vArray.rbegin(); it != vArray.rend(); ++it) {
+                        if (!it->empty()) nonEmptyFields.push_back(*it);
+                        if (nonEmptyFields.size() == 2) break;
                     }
-                    else
-                        conf.Proxies.emplace_back(std::move(vArray[i]));
-                }
-                confs.emplace_back(std::move(conf));
-                // 新增：解析 | 后参数
-                // 作者：js882829  时间：2025-07-03
-                // 检查最后一段是否包含 |，如有则解析
-                auto pipe_pos = vArray.back().find('|');
-                if (pipe_pos != std::string::npos) {
-                    std::string params = vArray.back().substr(pipe_pos + 1);
-                    StrArray paramList = split(params, ",");
-                    for (const auto& param : paramList) {
-                        auto kv = split(param, ":");
-                        if (kv.size() != 2) continue;
-                        std::string key = trim(kv[0]);
-                        std::string value = trim(kv[1]);
-                        if (key == "uselightgbm") confs.back().UseLightGBM = (value == "true");
-                        else if (key == "collectdata") confs.back().CollectData = (value == "true");
-                        else if (key == "policy-priority") {
-                            // 处理 ["Large:1.5"] 或 [Large:1.5] 这种格式
-                            if (!value.empty() && value.front() == '[' && value.back() == ']') {
-                                std::string arr = value.substr(1, value.size() - 2);
-                                confs.back().PolicyPriority = split(arr, ";");
-                            } else {
-                                confs.back().PolicyPriority = split(value, ";");
-                            }
+                    std::string timePart, params;
+                    if (nonEmptyFields.size() == 2) {
+                        // 最后一个非空字段为 smart参数，倒数第二个为时间参数
+                        params = nonEmptyFields[0];
+                        timePart = nonEmptyFields[1];
+                    } else if (nonEmptyFields.size() == 1) {
+                        // 只有一个非空字段，可能只有时间参数
+                        timePart = nonEmptyFields[0];
+                    }
+                    // 先解析时间参数
+                    parseGroupTimes(timePart, &conf.Interval, &conf.Timeout, &conf.Tolerance);
+                    // 再解析 smart 参数
+                    if (!params.empty() && params.find(":") != std::string::npos) {
+                        StrArray paramList = split(params, ",");
+                        for (size_t i = 0; i < paramList.size(); ++i) {
+                            // 新增：打印每个参数原始内容
+                            writeLog(LOG_TYPE_INFO, "smart参数分割: paramList[" + std::to_string(i) + "]=" + paramList[i], LOG_LEVEL_INFO);
+                            auto pos = paramList[i].find(':');
+                            if (pos == std::string::npos) continue;
+                            std::string key = trim(paramList[i].substr(0, pos));
+                            std::string value = trim(paramList[i].substr(pos + 1));
+                            // 新增：打印 key 内容
+                            writeLog(LOG_TYPE_INFO, "smart参数key: '" + key + "'", LOG_LEVEL_INFO);
+                            if (key == "policy-priority") {
+                                // 如果 value 以 [ 开头但不以 ] 结尾，说明被截断了
+                                while (!value.empty() && value.front() == '[' && (value.back() != ']') && i + 1 < paramList.size()) {
+                                    value += "," + paramList[++i];
+                                }
+                                // 调试日志：原始 value
+                                writeLog(LOG_TYPE_INFO, "policy-priority 解析: raw=" + value, LOG_LEVEL_INFO);
+                                // 去除中括号
+                                if (!value.empty() && value.front() == '[' && value.back() == ']') {
+                                    value = value.substr(1, value.size() - 2);
+                                }
+                                // 支持逗号或分号分隔
+                                StrArray arr;
+                                if (value.find(';') != std::string::npos) {
+                                    arr = split(value, ";");
+                                } else {
+                                    arr = split(value, ",");
+                                }
+                                conf.PolicyPriority.clear();
+                                for (auto& v : arr) {
+                                    std::string before = v;
+                                    v = trim(v);
+                                    // 去除首尾引号
+                                    if (!v.empty() && (v.front() == '"' || v.front() == '\'')) v = v.substr(1);
+                                    if (!v.empty() && (v.back() == '"' || v.back() == '\'')) v.pop_back();
+                                    // 调试日志：每个元素处理前后
+                                    writeLog(LOG_TYPE_INFO, "policy-priority 元素: before='" + before + "', after='" + v + "'", LOG_LEVEL_INFO);
+                                    if (!v.empty()) conf.PolicyPriority.push_back(v);
+                                }
+                                // 调试日志：最终结果
+                                writeLog(LOG_TYPE_INFO, "policy-priority 结果: " + join(conf.PolicyPriority, ","), LOG_LEVEL_INFO);
+                            } else if (key == "uselightgbm") conf.UseLightGBM = (value == "true");
+                            else if (key == "collectdata") conf.CollectData = (value == "true");
                         }
-                        // 可扩展更多参数
+                    }
+                    // 处理 proxies/provider（去掉最后两个字段）
+                    for(unsigned int i = 2; i < vArray.size() - 2; i++)
+                    {
+                        if(startsWith(vArray[i], "!!PROVIDER="))
+                        {
+                            string_array list = split(vArray[i].substr(11), ",");
+                            conf.UsingProvider.reserve(conf.UsingProvider.size() + list.size());
+                            std::move(list.begin(), list.end(), std::back_inserter(conf.UsingProvider));
+                        }
+                        else
+                            conf.Proxies.emplace_back(std::move(vArray[i]));
+                    }
+                } else {
+                    // 其它组类型
+                    for(unsigned int i = 2; i < rules_upper_bound; i++)
+                    {
+                        if(startsWith(vArray[i], "!!PROVIDER="))
+                        {
+                            string_array list = split(vArray[i].substr(11), ",");
+                            conf.UsingProvider.reserve(conf.UsingProvider.size() + list.size());
+                            std::move(list.begin(), list.end(), std::back_inserter(conf.UsingProvider));
+                        }
+                        else
+                            conf.Proxies.emplace_back(std::move(vArray[i]));
                     }
                 }
+
+                // 日志输出
+                writeLog(LOG_TYPE_INFO, "custom_proxy_group 解析: name=" + conf.Name +
+                    ", type=" + std::to_string((int)conf.Type) +
+                    ", UseLightGBM=" + (conf.UseLightGBM.is_undef() ? "undef" : (conf.UseLightGBM.get() ? "true" : "false")) +
+                    ", CollectData=" + (conf.CollectData.is_undef() ? "undef" : (conf.CollectData.get() ? "true" : "false")) +
+                    ", PolicyPriority=" + join(conf.PolicyPriority, ",") +
+                    ", Filter=" + conf.Filter, LOG_LEVEL_INFO);
+
+                confs.emplace_back(std::move(conf));
             }
             return confs;
         }
