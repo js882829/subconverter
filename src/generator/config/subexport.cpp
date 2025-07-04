@@ -596,20 +596,28 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
     for(const ProxyGroupConfig &x_origin : extra_proxy_group)
     {
         ProxyGroupConfig x = x_origin;
-        if (x.Type == ProxyGroupType::Smart) {
-            auto it = x.Proxies.begin();
-            while (it != x.Proxies.end()) {
-                if (it->find("http://") == 0 || it->find("https://") == 0) {
-                    x.Url = *it;
-                    it = x.Proxies.erase(it);
+        // 将 smart 分组的 url 提取逻辑提前到 groupGenerate 之前
+        string_array proxies_for_group;
+        if (x.Type == ProxyGroupType::Smart && !x.Proxies.empty()) {
+            proxies_for_group.reserve(x.Proxies.size());
+            for (const auto& item : x.Proxies) {
+                if (item.find("http://") == 0 || item.find("https://") == 0) {
+                    x.Url = item;
                 } else {
-                    ++it;
+                    proxies_for_group.push_back(item);
                 }
             }
+        } else {
+            proxies_for_group = x.Proxies;
+        }
+        // 获取所有节点名列表（只处理不含 url 的 proxies）
+        string_array filtered_nodelist;
+        if (!proxies_for_group.empty()) {
+            for (const auto& rule : proxies_for_group)
+                groupGenerate(rule, nodelist, filtered_nodelist, true, ext);
         }
         try {
             YAML::Node singlegroup;
-            string_array filtered_nodelist;
             // 统一写入 type
             singlegroup["type"] = x.TypeStr();
             // name 字段如包含特殊字符自动加引号
@@ -632,9 +640,9 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
             if (!x.IncludeAll.is_undef()) singlegroup["include-all"] = x.IncludeAll.get();
             if (!x.Lazy.is_undef()) singlegroup["lazy"] = x.Lazy.get();
             // proxies/use 字段
-            if (!x.Proxies.empty()) {
+            if (!filtered_nodelist.empty()) {
                 YAML::Node arr(YAML::NodeType::Sequence);
-                for (const auto& v : x.Proxies) arr.push_back(v);
+                for (const auto& v : filtered_nodelist) arr.push_back(v);
                 singlegroup["proxies"] = arr;
             } else if (!x.UsingProvider.empty()) {
                 YAML::Node arr(YAML::NodeType::Sequence);
@@ -797,11 +805,11 @@ std::string proxyToSurge(std::vector<Proxy> &nodes, const std::string &base_conf
         std::string port = std::to_string(x.Port);
         bool &tlssecure = x.TLSSecure;
 
-        tribool udp = ext.udp, tfo = ext.tfo, scv = ext.skip_cert_verify, tls13 = ext.tls13;
+        tribool udp = ext.udp, tfo = ext.tfo, scv = ext.skip_cert_verify;
         udp.define(x.UDP);
         tfo.define(x.TCPFastOpen);
         scv.define(x.AllowInsecure);
-        tls13.define(x.TLS13);
+        tribool tls13 = ext.tls13;
 
         std::string proxy, section, real_section;
         string_array args, headers;
@@ -836,7 +844,7 @@ std::string proxyToSurge(std::vector<Proxy> &nodes, const std::string &base_conf
         case ProxyType::VMess:
             if(surge_ver < 4 && surge_ver != -3)
                 continue;
-            proxy = "vmess, " + hostname + ", " + port + ", username=" + id + ", tls=" + (tlssecure ? "true" : "false") +  ", vmess-aead=" + (x.AlterId == 0 ? "true" : "false");
+            proxy = "vmess, " + hostname + ", " + port + ", username=" + id + ", tls=" + (tlssecure ? "true" : "false");
             if(tlssecure && !tls13.is_undef())
                 proxy += ", tls13=" + std::string(tls13 ? "true" : "false");
             switch(hash_(transproto))
@@ -958,7 +966,7 @@ std::string proxyToSurge(std::vector<Proxy> &nodes, const std::string &base_conf
                 continue;
             proxy = "hysteria, " + hostname + ", " + port + ", password=" + password;
             if(x.DownSpeed)
-                proxy += ", download-bandwidth=" + x.DownSpeed;
+                proxy += ", download-bandwidth=" + std::to_string(x.DownSpeed);
             
             if(!scv.is_undef())
                 proxy += ",skip-cert-verify=" + std::string(scv.get() ? "true" : "false");
