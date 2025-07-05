@@ -646,9 +646,8 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
                 if (!x.UseLightGBM.is_undef()) singlegroup["uselightgbm"] = x.UseLightGBM.get();
                 if (!x.CollectData.is_undef()) singlegroup["collectdata"] = x.CollectData.get();
                 if (!x.PolicyPriority.empty()) {
-                    YAML::Node arr(YAML::NodeType::Sequence);
-                    for (const auto& v : x.PolicyPriority) arr.push_back(v);
-                    singlegroup["policy-priority"] = arr;
+                    std::string joined = join(x.PolicyPriority, ";");
+                    singlegroup["policy-priority"] = joined;
                 }
             }
             // 详细调试日志
