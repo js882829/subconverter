@@ -11,6 +11,10 @@
 
 ## 新增内容
 
+2025/07/13
+
+-   新增 [配置文件](#配置文件) 中 `[clash_proxy_group]` 部分的说明
+
 2021/10/1
 
 -   新增 [配置文件](#配置文件) 中 `[advanced]` 部分的说明
@@ -933,38 +937,40 @@ custom_proxy_group=🍎 苹果服务`url-test`(美国|US)`http://www.gstatic.com
 # 表示创建一个叫 🍎 苹果服务 的 url-test 策略组,并向其中添加名字含'美国','US'的节点，每隔300秒测试一次，测速超时为5s，切换节点的延迟容差为100ms
 custom_proxy_group=🇯🇵 日本延迟最低`url-test`(日|JP)`http://www.gstatic.com/generate_204`300,5
 # 表示创建一个叫 🇯🇵 日本延迟最低 的 url-test 策略组,并向其中添加名字含'日','JP'的节点，每隔300秒测试一次，测速超时为5s
-custom_proxy_group=负载均衡`load-balance`.*`http://www.gstatic.com/generate_204`300,,100
-# 表示创建一个叫 负载均衡 的 load-balance 策略组,并向其中添加所有的节点，每隔300秒测试一次，切换节点的延迟容差为100ms
+custom_proxy_group=负载均衡`load-balance`.*`http://www.gstatic.com/generate_204`300,,100,round-robin
+# 表示创建一个叫 负载均衡 的 load-balance 策略组(默认为consistent-hashing)【策略为round-robin】,并向其中添加所有的节点，每隔300秒测试一次，切换节点的延迟容差为100ms
 custom_proxy_group=🇯🇵 JP`select`沪日`日本`[]🇯🇵 日本延迟最低
 # 表示创建一个叫 🇯🇵 JP 的 select 策略组,并向其中**依次**添加名字含'沪日','日本'的节点，以及引用上述所创建的 🇯🇵 日本延迟最低 策略组
 custom_proxy_group=节点选择`select`(^(?!.*(美国|日本)).*)
 # 表示创建一个叫 节点选择 的 select 策略组,并向其中**依次**添加名字不包含'美国'或'日本'的节点
+custom_proxy_group=♻️ 智能香港`smart`(?=.*(香港|HK|Hong Kong|🇭🇰|HongKong))^((?!(深港|家宽|游戏|剩余|流量|0.5|0.5倍|0.5x|2.0|2倍|2x|3.0|3倍|3x|4.0|4倍|4x|5.0|5倍|5x|Game)).)*$`http://www.google.com/generate_204`300,5000,100`uselightgbm:true,collectdata:true,policy-priority:["Large:1.5","Lil:0.9"]
+# 表示创建一个叫 智能香港 的 smart 策略组，并向其中**依次**添加名包含 ‘香港|HK|Hong Kong|🇭🇰|HongKong’的节点，不包含 ‘深港|家宽|游戏|剩余|流量|0.5|0.5倍|0.5x|2.0|2倍|2x|3.0|3倍|3x|4.0|4倍|4x|5.0|5倍|5x|Game’ 的节点，测试连接 ‘http://www.google.com/generate_204’，配置参数 ‘300,5000,100’ 分别代表 interval,timeout,tolerance，配置smart参数 ‘uselightgbm:true,collectdata:true,policy-priority:["Large:1.5","Lil:0.9"]’
 ```
 
--   还可使用一些特殊筛选条件：
+- 还可使用一些特殊筛选条件：
 
-    `` `!!GROUPID=%n%`` 待转换链接中的第 n+1 条链接中包含的节点
+  `` `!!GROUPID=%n%`` 待转换链接中的第 n+1 条链接中包含的节点
 
-    `` `!!INSERT=%n%`` 配置文件中 `insert_url` 的第 n+1 条链接所包含的节点
+  `` `!!INSERT=%n%`` 配置文件中 `insert_url` 的第 n+1 条链接所包含的节点
 
-    `` `!!PROVIDER=%proxy-provider-name%`` 指定名称的proxy-provider
+  `` `!!PROVIDER=%proxy-provider-name%`` 指定名称的proxy-provider
 
-    GROUPID 和 INSERT 匹配支持range,如 1,!2,3-4,!5-6,7+,8-
+  GROUPID 和 INSERT 匹配支持range,如 1,!2,3-4,!5-6,7+,8-
 
-    ```ini
-    custom_proxy_group=g1`select`!!GROUPID=0`!!INSERT=0
-    # 表示创建一个叫 g1 的 select 策略组,并向其中依次添加订阅链接中第一条订阅链接中的所有节点和配置文件中 insert_url 中的**第一个**节点
-    custom_proxy_group=g2`select`!!GROUPID=1
-    # 表示创建一个叫 g2 的 select 策略组,并向其中依次添加订阅链接中第二条订阅链接中的所有节点
-    custom_proxy_group=g3`select`!!GROUPID=!2
-    # 表示创建一个叫 g3 的 select 策略组,并向其中依次添加订阅链接中除了第三条订阅链接之外的所有节点
-    custom_proxy_group=g4`select`!!GROUPID=3-5
-    # 表示创建一个叫 g4 的 select 策略组,并向其中依次添加订阅链接中第四条到第六条订阅链接中的所有节点
-    custom_proxy_group=v2ray`select`!!GROUP=V2RayProvider
-    # 表示创建一个叫 v2ray 的 select 策略组,并向其中依次添加订阅链接中组名（tag）为 V2RayProvider 的所有节点
-    ```
+  ```ini
+  custom_proxy_group=g1`select`!!GROUPID=0`!!INSERT=0
+  # 表示创建一个叫 g1 的 select 策略组,并向其中依次添加订阅链接中第一条订阅链接中的所有节点和配置文件中 insert_url 中的**第一个**节点
+  custom_proxy_group=g2`select`!!GROUPID=1
+  # 表示创建一个叫 g2 的 select 策略组,并向其中依次添加订阅链接中第二条订阅链接中的所有节点
+  custom_proxy_group=g3`select`!!GROUPID=!2
+  # 表示创建一个叫 g3 的 select 策略组,并向其中依次添加订阅链接中除了第三条订阅链接之外的所有节点
+  custom_proxy_group=g4`select`!!GROUPID=3-5
+  # 表示创建一个叫 g4 的 select 策略组,并向其中依次添加订阅链接中第四条到第六条订阅链接中的所有节点
+  custom_proxy_group=v2ray`select`!!GROUP=V2RayProvider
+  # 表示创建一个叫 v2ray 的 select 策略组,并向其中依次添加订阅链接中组名（tag）为 V2RayProvider 的所有节点
+  ```
 
-    注意：此处的订阅链接指 `default_url` 和 `&url=` 中的订阅以及单链接节点（区别于配置文件中 insert_url）
+  注意：此处的订阅链接指 `default_url` 和 `&url=` 中的订阅以及单链接节点（区别于配置文件中 insert_url）
 
 -   现在也可以使用2个条件组合来进行筛选，只有同时满足这2个筛选条件的节点才会被加入组内
 
