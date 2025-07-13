@@ -630,6 +630,10 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode, const ProxyGr
             if (!x.DisableUdp.is_undef()) singlegroup["disable-udp"] = x.DisableUdp.get();
             if (!x.IncludeAll.is_undef()) singlegroup["include-all"] = x.IncludeAll.get();
             if (!x.Lazy.is_undef()) singlegroup["lazy"] = x.Lazy.get();
+            // 新增：load-balance类型输出strategy字段
+            if (x.Type == ProxyGroupType::LoadBalance) {
+                singlegroup["strategy"] = x.StrategyStr();
+            }
             // proxies/use 字段
             if (!filtered_nodelist.empty()) {
                 YAML::Node arr(YAML::NodeType::Sequence);

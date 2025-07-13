@@ -250,7 +250,19 @@ namespace INIBinding
                     if(rules_upper_bound < 5) continue;
                     rules_upper_bound -= 2;
                     conf.Url = vArray[rules_upper_bound];
-                    parseGroupTimes(vArray[rules_upper_bound + 1], &conf.Interval, &conf.Timeout, &conf.Tolerance);
+                    // 支持strategy参数解析
+                    std::string time_and_strategy = vArray[rules_upper_bound + 1];
+                    StrArray params = split(time_and_strategy, ",");
+                    if (!params.empty()) conf.Interval = to_int(params[0], 0);
+                    if (params.size() > 1) conf.Timeout = to_int(params[1], 0);
+                    if (params.size() > 2) conf.Tolerance = to_int(params[2], 0);
+                    if (conf.Type == ProxyGroupType::LoadBalance && params.size() > 3) {
+                        std::string strategy = trim(params[3]);
+                        if (strategy == "consistent-hashing")
+                            conf.Strategy = BalanceStrategy::ConsistentHashing;
+                        else if (strategy == "round-robin")
+                            conf.Strategy = BalanceStrategy::RoundRobin;
+                    }
                 }
 
                 // smart组特殊处理
